@@ -1,0 +1,5 @@
+config DLT_PROVISION
+    bool "Enable provisioning"
+    default n
+    help
+        Enable this option to support network provisioning.

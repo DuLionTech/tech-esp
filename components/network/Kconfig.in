@@ -1,0 +1,22 @@
+config DLT_NETWORK_SUPPORT
+    bool "Enable network support"
+    default n
+    help
+        Enable this option to support network devices.
+if DLT_NETWORK_SUPPORT
+    choice DLT_NETWORK_SELECT
+        prompt "Network component"
+        default DLT_NETWORK_PROVISION
+        help
+            Choose the network device you want to support.
+        config DLT_NETWORK_PROVISION
+            bool "Provisioning"
+            select DLT_PROVISION
+            help
+                Enable this option to support device network provisioning
+        config DLT_NETWORK_QEMU
+            bool "QEMU"
+            help
+                Enable this option to support QEMU network connectivity
+    endchoice
+endif
