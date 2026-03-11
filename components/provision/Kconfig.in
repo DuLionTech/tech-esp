@@ -1,4 +1,4 @@
-config DLT_PROVISION
+config DT_PROVISION
     bool "Enable provisioning"
     default n
     help

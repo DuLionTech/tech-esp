@@ -9,7 +9,7 @@
 #include <esp_wifi.h>
 #include <nvs_flash.h>
 
-#include <dlt_network.h>
+#include <dt_network.h>
 #include "../../../components/provision/include/sec2.h"
 
 #define OK ESP_ERROR_CHECK

@@ -1,4 +1,0 @@
-menu "DuLion Tech Components"
-    rsource "network/Kconfig.in"
-    rsource "provision/Kconfig.in"
-endmenu

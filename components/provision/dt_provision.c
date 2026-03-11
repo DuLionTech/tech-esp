@@ -8,7 +8,7 @@
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_ble.h>
 
-#include "dlt_provision.h"
+#include "dt_provision.h"
 #define OK ESP_ERROR_CHECK
 
 // Private Declarations
