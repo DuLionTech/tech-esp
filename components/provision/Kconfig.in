@@ -1,5 +1,6 @@
 config DT_PROVISION
     bool "Enable provisioning"
+    select BT_ENABLED
     default n
     help
         Enable this option to support network provisioning.
