@@ -9,7 +9,7 @@
 
 static const char* TAG = "network";
 
-static EventGroupHandle_t wifi_event_group;
+static EventGroupHandle_t netif_event_group;
 
 void app_main(void) {
     esp_err_t ret = nvs_flash_init();
@@ -20,8 +20,9 @@ void app_main(void) {
 
     OK(esp_netif_init());
     OK(esp_event_loop_create_default());
-    wifi_event_group = xEventGroupCreate();
-    OK(dt_network_init(wifi_event_group));
+    netif_event_group = xEventGroupCreate();
+    OK(dt_network_start(netif_event_group));
+    xEventGroupWaitBits(netif_event_group, NETIF_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
     // esp_netif_create_default_wifi_sta();
 }
