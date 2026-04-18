@@ -1,0 +1,4 @@
+menu "DuLion Tech Components"
+    rsource "../dlt_network/Kconfig.in"
+    rsource "../dlt_wifi/Kconfig.in"
+endmenu

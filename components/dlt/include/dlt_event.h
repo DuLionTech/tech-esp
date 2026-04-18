@@ -1,0 +1,6 @@
+#ifndef DLT_EVENT_H
+#define DLT_EVENT_H
+
+#define DLT_NET_CONNECTED_BIT BIT0
+
+#endif //DLT_EVENT_H

@@ -1,12 +1,11 @@
 #include <string.h>
 #include <esp_wifi.h>
 #include <nvs_flash.h>
-
-#include <dt_err.h>
-#include <dt_network.h>
-#include <dt_netif.h>
-
 #include <freertos/task.h>
+
+#include <dlt_err.h>
+#include <dlt_event.h>
+#include <dlt_network.h>
 
 static const char* TAG = "network";
 
@@ -25,7 +24,7 @@ void app_main(void) {
     OK(dt_network_start(netif_event_group));
 
     ESP_LOGI(TAG, "Waiting for network connection");
-    xEventGroupWaitBits(netif_event_group, NETIF_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    xEventGroupWaitBits(netif_event_group, DLT_NET_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
     // ReSharper disable once CppDFAEndlessLoop
     for (;;) {
         ESP_LOGI(TAG, "Running!");
