@@ -4,6 +4,7 @@
 
 #include <dt_err.h>
 #include <dt_network.h>
+#include <dt_netif.h>
 
 #include <freertos/task.h>
 
@@ -22,7 +23,13 @@ void app_main(void) {
     OK(esp_event_loop_create_default());
     netif_event_group = xEventGroupCreate();
     OK(dt_network_start(netif_event_group));
-    xEventGroupWaitBits(netif_event_group, NETIF_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    // esp_netif_create_default_wifi_sta();
+    ESP_LOGI(TAG, "Waiting for network connection");
+    xEventGroupWaitBits(netif_event_group, NETIF_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    // ReSharper disable once CppDFAEndlessLoop
+    for (;;) {
+        ESP_LOGI(TAG, "Running!");
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
 }
+

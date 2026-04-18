@@ -9,4 +9,4 @@ endif ()
 idf_component_register(
         SRCS ${srcs}
         INCLUDE_DIRS ${include_dirs}
-        PRIV_REQUIRES dulion_tech esp_netif esp_wifi wifi_provisioning bt esp_event)
+        PRIV_REQUIRES dulion_tech esp_netif esp_wifi wifi_provisioning bt esp_event nvs_flash)

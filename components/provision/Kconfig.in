@@ -1,6 +1,9 @@
 config DT_PROVISION
     bool "Enable provisioning"
-    select BT_ENABLED
+    select BT_ENABLE
+    select ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2
+    select BT_BLE_42_FEATURES_SUPPORTED
+    depends on !BT_BLE_50_FEATURES_SUPPORTED
     default n
     help
         Enable this option to support network provisioning.
