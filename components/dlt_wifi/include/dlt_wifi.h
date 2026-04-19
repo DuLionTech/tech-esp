@@ -3,7 +3,7 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
-#include <dlt_err.h>
+#include <dlt_error.h>
 
 esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group);
 

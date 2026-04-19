@@ -3,7 +3,7 @@
 #include <nvs_flash.h>
 #include <freertos/task.h>
 
-#include <dlt_err.h>
+#include <dlt_error.h>
 #include <dlt_event.h>
 #include <dlt_network.h>
 

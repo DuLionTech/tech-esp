@@ -1,5 +1,5 @@
 #include <string.h>
-#include <dlt_err.h>
+#include <dlt_error.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <esp_netif.h>
