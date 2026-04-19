@@ -55,18 +55,18 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
     ESP_LOGI(TAG, "Initializing WiFi in station mode...");
     esp_netif_config_t netif_config = ESP_NETIF_DEFAULT_WIFI_STA();
     s_wifi_netif = esp_netif_new(&netif_config);
-    ESP_GOTO_ON_FALSE(s_wifi_netif != NULL, ESP_FAIL, fail, TAG, "Failed to create WiFi station interface");
+    ON_FALSE(s_wifi_netif != NULL, ESP_FAIL, fail, TAG, "Failed to create WiFi station interface");
     s_wifi_driver = esp_wifi_create_if_driver(WIFI_IF_STA);
-    ESP_GOTO_ON_FALSE(s_wifi_driver != NULL, ESP_FAIL, fail, TAG, "Failed to create WiFi station driver");
-    ESP_GOTO_ON_ERROR(esp_netif_attach(s_wifi_netif, s_wifi_driver), fail, TAG, "Failed to attach station driver");
-    ESP_GOTO_ON_ERROR(
+    ON_FALSE(s_wifi_driver != NULL, ESP_FAIL, fail, TAG, "Failed to create WiFi station driver");
+    ON_ERROR(esp_netif_attach(s_wifi_netif, s_wifi_driver), fail, TAG, "Failed to attach station driver");
+    ON_ERROR(
         esp_register_shutdown_handler((shutdown_handler_t) esp_wifi_stop),
         fail,
         TAG,
         "Failed to register shutdown handler");
 
     wifi_init_config_t wifi_config = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_GOTO_ON_ERROR(esp_wifi_init(&wifi_config), fail, TAG, "Failed to initialize WiFi");
+    ON_ERROR(esp_wifi_init(&wifi_config), fail, TAG, "Failed to initialize WiFi");
 
     // ---- Provisioning Manager ----
 
@@ -77,15 +77,15 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
             .wifi_conn_attempts = WIFI_CONN_ATTEMPTS,
         },
     };
-    ESP_ERROR_CHECK(wifi_prov_mgr_init(prov_config));
+    ON_ERROR(wifi_prov_mgr_init(prov_config), fail, TAG, "Failed to initialize provisioning manager");
 
     bool is_provisioned = false;
-    ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&is_provisioned));
+    ON_ERROR(wifi_prov_mgr_is_provisioned(&is_provisioned), fail, TAG, "Failed to get provision status");
     if (is_provisioned) {
         ESP_LOGI(TAG, "WiFi is already provisioned");
         wifi_prov_mgr_deinit();
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-        ESP_ERROR_CHECK(esp_wifi_start());
+        ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), fail, TAG, "Failed to set WIFI station mode");
+        ON_ERROR(esp_wifi_start(), fail, TAG, "Failed to start WIFI");
         ESP_LOGI(TAG, "WiFi started");
     } else {
         ESP_LOGI(TAG, "Provisioning WiFi access");
@@ -106,18 +106,23 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
         snprintf(service_name, sizeof(service_name), "PROV_%02X%02X%02X", eth_mac[3], eth_mac[4], eth_mac[5]);
         ESP_LOGI(TAG, "Device service name: %s", service_name);
 
-        // Must be called before provisioning starts
-        wifi_prov_mgr_endpoint_create("custom-data");
-
-        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, &sec2_params, service_name, NULL));
-
-        // Must be called after provisioning starts
-        wifi_prov_mgr_endpoint_register("custom-data", provision_data_handler, NULL);
+        ON_ERROR(wifi_prov_mgr_endpoint_create("custom-data"), fail, TAG, "Failed to create custom data endpoint");
+        ON_ERROR(
+            wifi_prov_mgr_start_provisioning(security, &sec2_params, service_name, NULL),
+            fail,
+            TAG,
+            "Failed to initiate WIFI provisioning");
+        ON_ERROR(
+            wifi_prov_mgr_endpoint_register("custom-data", provision_data_handler, NULL),
+            fail,
+            TAG,
+            "Failed to register custom data endpoint");
     }
 
     return ESP_OK;
 
 fail:
+    wifi_prov_mgr_deinit();
     esp_unregister_shutdown_handler((shutdown_handler_t)esp_wifi_stop);
 
     esp_wifi_destroy_if_driver(s_wifi_driver);
