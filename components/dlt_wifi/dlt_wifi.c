@@ -17,7 +17,6 @@
 #include <dlt_event.h>
 
 #include "dlt_wifi.h"
-#include "dlt_sec2.h"
 
 #define WIFI_CONN_ATTEMPTS 5
 
@@ -42,6 +41,15 @@ static esp_err_t provision_data_handler(
 static void wifi_start(esp_event_base_t event_base, int32_t event_id, void* event_data);
 
 // ==== Public Implementations ====
+
+extern const char sec2_salt_start[]     asm("_binary_salt_bin_start");
+extern const char sec2_salt_end[]       asm("_binary_salt_bin_end");
+
+extern const char sec2_verifier_start[] asm("_binary_verifier_bin_start");
+extern const char sec2_verifier_end[]   asm("_binary_verifier_bin_end");
+
+extern uint8_t service_uuid_start[]     asm("_binary_uuid_bin_start");
+extern uint8_t service_uuid_end[]       asm("_binary_uuid_bin_end");
 
 esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
     esp_err_t ret = ESP_FAIL;
@@ -88,15 +96,17 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
         ON_ERROR(esp_wifi_start(), fail, TAG, "Failed to start WIFI");
         ESP_LOGI(TAG, "WiFi started");
     } else {
-        ESP_LOGI(TAG, "Provisioning WiFi access");
+        uint16_t salt_len = sec2_salt_end - sec2_salt_start;
+        uint16_t verifier_len = sec2_verifier_end - sec2_verifier_start;
+        ESP_LOGI(TAG, "Provisioning WiFi access: salt %d, verifier %d", salt_len, verifier_len);
 
-        wifi_prov_scheme_ble_set_service_uuid(service_uuid);
+        wifi_prov_scheme_ble_set_service_uuid(service_uuid_start);
         wifi_prov_security_t security = WIFI_PROV_SECURITY_2;
         wifi_prov_security2_params_t sec2_params = {
-            .salt = sec2_salt,
-            .salt_len = sizeof(sec2_salt),
-            .verifier = sec2_verifier,
-            .verifier_len = sizeof(sec2_verifier),
+            .salt = sec2_salt_start,
+            .salt_len = sec2_salt_end - sec2_salt_start,
+            .verifier = sec2_verifier_start,
+            .verifier_len = sec2_verifier_end - sec2_verifier_start,
         };
 
         uint8_t eth_mac[6];

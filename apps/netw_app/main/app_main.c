@@ -18,6 +18,7 @@ void app_main(void) {
         OK(nvs_flash_init());
     }
 
+    OK(esp_netif_init());
     OK(esp_event_loop_create_default());
 
     netif_event_group = xEventGroupCreate();
