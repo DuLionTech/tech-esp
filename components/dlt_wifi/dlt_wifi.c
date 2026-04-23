@@ -8,6 +8,7 @@
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_ble.h>
 #include <esp_private/wifi.h>
+#include <esp_partition.h>
 
 #include <sys/types.h>
 
@@ -20,10 +21,21 @@
 
 #define WIFI_CONN_ATTEMPTS 5
 
+#define SERVICE_NAME "PROV_%02X%02X%02X"
+
+#define SERVICE_UUID_LEN 16
+#define SEC2_SALT_LEN 16
+#define SEC2_VERIFIER_LEN 384
+
+#define SERVICE_UUID_OFFSET 0
+#define SEC2_SALT_OFFSET (SERVICE_UUID_OFFSET + SERVICE_UUID_LEN)
+#define SEC2_VERIFIER_OFFSET (SEC2_SALT_OFFSET + SEC2_SALT_LEN)
+
 static const char* TAG = "dlt_wifi";
 static esp_netif_t* s_wifi_netif = NULL;
 static wifi_netif_driver_t s_wifi_driver = NULL;
 static EventGroupHandle_t s_netif_event_group;
+static char provision_data[416];
 
 // Private Declarations
 static void provision_handler(void* ctx, esp_event_base_t event_base, int32_t event_id, void* event_data);
@@ -39,17 +51,10 @@ static esp_err_t provision_data_handler(
     ssize_t* out_len,
     void* data);
 static void wifi_start(esp_event_base_t event_base, int32_t event_id, void* event_data);
+static esp_err_t provision_start();
 
 // ==== Public Implementations ====
 
-extern const char sec2_salt_start[]     asm("_binary_salt_bin_start");
-extern const char sec2_salt_end[]       asm("_binary_salt_bin_end");
-
-extern const char sec2_verifier_start[] asm("_binary_verifier_bin_start");
-extern const char sec2_verifier_end[]   asm("_binary_verifier_bin_end");
-
-extern uint8_t service_uuid_start[]     asm("_binary_uuid_bin_start");
-extern uint8_t service_uuid_end[]       asm("_binary_uuid_bin_end");
 
 esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
     esp_err_t ret = ESP_FAIL;
@@ -96,37 +101,7 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
         ON_ERROR(esp_wifi_start(), fail, TAG, "Failed to start WIFI");
         ESP_LOGI(TAG, "WiFi started");
     } else {
-        uint16_t salt_len = sec2_salt_end - sec2_salt_start;
-        uint16_t verifier_len = sec2_verifier_end - sec2_verifier_start;
-        ESP_LOGI(TAG, "Provisioning WiFi access: salt %d, verifier %d", salt_len, verifier_len);
-
-        wifi_prov_scheme_ble_set_service_uuid(service_uuid_start);
-        wifi_prov_security_t security = WIFI_PROV_SECURITY_2;
-        wifi_prov_security2_params_t sec2_params = {
-            .salt = sec2_salt_start,
-            .salt_len = sec2_salt_end - sec2_salt_start,
-            .verifier = sec2_verifier_start,
-            .verifier_len = sec2_verifier_end - sec2_verifier_start,
-        };
-
-        uint8_t eth_mac[6];
-        esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-
-        char service_name[12];
-        snprintf(service_name, sizeof(service_name), "PROV_%02X%02X%02X", eth_mac[3], eth_mac[4], eth_mac[5]);
-        ESP_LOGI(TAG, "Device service name: %s", service_name);
-
-        ON_ERROR(wifi_prov_mgr_endpoint_create("custom-data"), fail, TAG, "Failed to create custom data endpoint");
-        ON_ERROR(
-            wifi_prov_mgr_start_provisioning(security, &sec2_params, service_name, NULL),
-            fail,
-            TAG,
-            "Failed to initiate WIFI provisioning");
-        ON_ERROR(
-            wifi_prov_mgr_endpoint_register("custom-data", provision_data_handler, NULL),
-            fail,
-            TAG,
-            "Failed to register custom data endpoint");
+        provision_start();
     }
 
     return ESP_OK;
@@ -145,6 +120,52 @@ fail:
 }
 
 // ==== Private Implementations ====
+
+static esp_err_t provision_start() {
+    esp_err_t ret = ESP_FAIL;
+
+    ESP_LOGI(TAG, "Provisioning WiFi access");
+
+    const esp_partition_t* partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA,
+        ESP_PARTITION_SUBTYPE_ANY,
+        "data");
+    ON_FALSE(partition != NULL, ESP_FAIL, fail, TAG, "Data partition not found");
+    OK(esp_partition_read(partition, 0, provision_data, sizeof(provision_data)));
+
+    wifi_prov_security_t security = WIFI_PROV_SECURITY_2;
+    wifi_prov_security2_params_t sec2_params = {
+        .salt = provision_data + SEC2_SALT_OFFSET,
+        .salt_len = SEC2_SALT_LEN,
+        .verifier = provision_data + SEC2_VERIFIER_OFFSET,
+        .verifier_len = SEC2_VERIFIER_LEN,
+    };
+
+    uint8_t eth_mac[6];
+    esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+
+    char service_name[12];
+    snprintf(service_name, sizeof(service_name), "PROV_%02X%02X%02X", eth_mac[3], eth_mac[4], eth_mac[5]);
+    ESP_LOGI(TAG, "Device service name: %s", service_name);
+
+    OK(wifi_prov_scheme_ble_set_service_uuid((uint8_t *)provision_data + SERVICE_UUID_OFFSET));
+    ON_ERROR(wifi_prov_mgr_endpoint_create("custom-data"), fail, TAG, "Failed to create custom data endpoint");
+    ON_ERROR(
+        wifi_prov_mgr_start_provisioning(security, &sec2_params, service_name, NULL),
+        fail,
+        TAG,
+        "Failed to initiate WIFI provisioning");
+    ON_ERROR(
+        wifi_prov_mgr_endpoint_register("custom-data", provision_data_handler, NULL),
+        fail,
+        TAG,
+        "Failed to register custom data endpoint");
+
+    return ESP_OK;
+
+fail:
+    return ret;
+}
 
 static void wifi_handler(void* ctx, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     switch (event_id) {
