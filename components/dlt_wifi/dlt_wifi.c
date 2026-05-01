@@ -95,13 +95,14 @@ esp_err_t dlt_wifi_start(EventGroupHandle_t netif_event_group) {
     bool is_provisioned = false;
     ON_ERROR(wifi_prov_mgr_is_provisioned(&is_provisioned), fail, TAG, "Failed to get provision status");
     if (is_provisioned) {
-        ESP_LOGI(TAG, "WiFi is already provisioned");
+        ESP_LOGI(TAG, "Using existing WiFi configuration");
         wifi_prov_mgr_deinit();
         ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), fail, TAG, "Failed to set WIFI station mode");
         ON_ERROR(esp_wifi_start(), fail, TAG, "Failed to start WIFI");
         ESP_LOGI(TAG, "WiFi started");
     } else {
-        provision_start();
+        ESP_LOGI(TAG, "Provisioning WiFi configuration");
+        ON_ERROR(provision_start(), fail, TAG, "Failed to start provisioning");
     }
 
     return ESP_OK;
@@ -111,7 +112,7 @@ fail:
     esp_unregister_shutdown_handler((shutdown_handler_t)esp_wifi_stop);
 
     esp_wifi_destroy_if_driver(s_wifi_driver);
-    s_wifi_netif = NULL;
+    s_wifi_driver = NULL;
 
     esp_netif_destroy(s_wifi_netif);
     s_wifi_netif = NULL;
@@ -124,7 +125,6 @@ fail:
 static esp_err_t provision_start() {
     esp_err_t ret = ESP_FAIL;
 
-    ESP_LOGI(TAG, "Provisioning WiFi access");
 
     const esp_partition_t* partition = esp_partition_find_first(
         ESP_PARTITION_TYPE_DATA,
@@ -193,14 +193,7 @@ static void wifi_handler(void* ctx, esp_event_base_t event_base, int32_t event_i
             esp_wifi_connect();
             break;
         case WIFI_EVENT_HOME_CHANNEL_CHANGE: {
-            wifi_event_home_channel_change_t* event = (wifi_event_home_channel_change_t*)event_data;
-            ESP_LOGI(
-                TAG,
-                "WiFi channel changed from %d/%d to %d/%d",
-                event->old_chan,
-                event->old_snd,
-                event->new_chan,
-                event->new_snd);
+            ESP_LOGI(TAG, "WiFi channel changed");
             break;
         }
         default:
@@ -229,7 +222,7 @@ static void session_handler(void* ctx, esp_event_base_t event_base, int32_t even
             ESP_LOGI(TAG, "Secured session established");
             break;
         case PROTOCOMM_SECURITY_SESSION_INVALID_SECURITY_PARAMS:
-            ESP_LOGE(TAG, "Received invald security parameters for establishing secure session");;
+            ESP_LOGE(TAG, "Received invald security parameters for establishing secure session");
             break;
         case PROTOCOMM_SECURITY_SESSION_CREDENTIALS_MISMATCH:
             ESP_LOGE(TAG, "Received incorrect credentials for establishing secure session");
@@ -249,13 +242,11 @@ static void provision_handler(void* ctx, esp_event_base_t event_base, int32_t ev
             ESP_LOGI(TAG, "Provisioning started");
             break;
         case WIFI_PROV_SET_STA_CONFIG:
-            ESP_LOGI(TAG, "Receiving credentials");
+            ESP_LOGI(TAG, "Updating WiFi station configuration");
             break;
-        case WIFI_PROV_CRED_RECV: {
-            wifi_sta_config_t* cfg = (wifi_sta_config_t*)event_data;
-            ESP_LOGI(TAG, "Received credentials - SSID: %s, Password: %s", cfg->ssid, cfg->password);
+        case WIFI_PROV_CRED_RECV:
+            ESP_LOGI(TAG, "Received credentials from provisioning");
             break;
-        }
         case WIFI_PROV_CRED_SUCCESS:
             ESP_LOGI(TAG, "Provisioning successful");
             break;
@@ -270,11 +261,11 @@ static void provision_handler(void* ctx, esp_event_base_t event_base, int32_t ev
             break;
         }
         case WIFI_PROV_END:
-            ESP_LOGI(TAG, "Provisioning done");
+            ESP_LOGI(TAG, "Provisioning ending");
             wifi_prov_mgr_deinit();
             break;
         case WIFI_PROV_DEINIT:
-            ESP_LOGI(TAG, "Provisioning manager deinitialized");
+            ESP_LOGI(TAG, "Provisioning deinitialized");
             break;
         default:
             ESP_LOGI(TAG, "Unhandled provisioning event %d", event_id);
@@ -286,12 +277,12 @@ static void ip_handler(void* ctx, esp_event_base_t event_base, int32_t event_id,
     switch (event_id) {
         case IP_EVENT_STA_GOT_IP: {
             ip_event_got_ip_t* event = (ip_event_got_ip_t*)event_data;
-            ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+            ESP_LOGI(TAG, "Received assigned IP address: " IPSTR, IP2STR(&event->ip_info.ip));
             xEventGroupSetBits(s_netif_event_group, DLT_NET_CONNECTED_BIT);
             break;
         }
         case IP_EVENT_STA_LOST_IP:
-            ESP_LOGI(TAG, "Lost IP");
+            ESP_LOGI(TAG, "Lost assigned IP address");
             xEventGroupClearBits(s_netif_event_group, DLT_NET_CONNECTED_BIT);
             break;
         default:
@@ -347,7 +338,7 @@ static void wifi_start(esp_event_base_t event_base, int32_t event_id, void* even
 
     esp_ret = esp_wifi_internal_reg_netstack_buf_cb(esp_netif_netstack_buf_ref, esp_netif_netstack_buf_free);
     if (esp_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register WiFi netstack buffer callbacks: %d", esp_ret);
+        ESP_LOGE(TAG, "Failed to register WiFi network stack buffer callbacks: %d", esp_ret);
     }
 
     // Section 1.3 Set MAC address of the WiFi interface

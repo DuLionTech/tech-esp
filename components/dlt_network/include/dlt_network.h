@@ -5,6 +5,6 @@
 #include <freertos/event_groups.h>
 
 
-esp_err_t dt_network_start(EventGroupHandle_t netif_event_group);
+esp_err_t dlt_network_start(EventGroupHandle_t netif_event_group);
 
 #endif // DT_NETWORK_H

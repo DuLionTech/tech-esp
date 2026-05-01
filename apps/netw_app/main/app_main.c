@@ -22,10 +22,12 @@ void app_main(void) {
     OK(esp_event_loop_create_default());
 
     netif_event_group = xEventGroupCreate();
-    OK(dt_network_start(netif_event_group));
+    assert(netif_event_group != NULL);
+    OK(dlt_network_start(netif_event_group));
 
     ESP_LOGI(TAG, "Waiting for network connection");
     xEventGroupWaitBits(netif_event_group, DLT_NET_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+
     // ReSharper disable once CppDFAEndlessLoop
     for (;;) {
         ESP_LOGI(TAG, "Running!");
